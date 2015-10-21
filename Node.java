@@ -1,4 +1,4 @@
-import org.apache.hadoop.io.Text;
+import java.util.*;
 
 public class Node {
   /*
@@ -6,15 +6,20 @@ public class Node {
    * ID   \t  EDGES|RANK
    * 0      1,2,5,6|125
    */
-  private final int id;
-  private List<Integer> edges;
-  private int rank;
+  public final int id;
+  public List<Integer> edges;
+  public int rank;
 
+  /**
+   * Create a new node from its string representation
+   *
+   * @param str the string representation of the node
+   */
   public Node(String str) {
     // split the string into the id and data
     String[] split = str.split("\t");
     String key = split[0];
-    String data = split[1]
+    String data = split[1];
 
     // parse the key and make the id it
     this.id = Integer.parseInt(key);
@@ -31,11 +36,30 @@ public class Node {
     this.rank = Integer.parseInt(tokens[1]);
   }
 
-  public Text getTextRepr() {
+  /**
+   * Return the full string representation of the node
+   */
+  public String toString() {
+    return "" + id + "\t" + getDataString();
+  }
+
+  /**
+   * Return the string representation of the node data
+   */
+  public String getDataString() {
     StringBuffer s = new StringBuffer();
 
+    // add the adjacency list
     for (int v : edges) {
-
+      s.append(v).append(",");
     }
+
+    // divider
+    s.append("|");
+
+    // add the rank
+    s.append(rank);
+
+    return s.toString();
   }
 }

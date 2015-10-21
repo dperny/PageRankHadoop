@@ -1,5 +1,7 @@
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -16,15 +18,22 @@ public class PageRank extends Configured implements Tool {
       Mapper<LongWritable, Text, IntWritable, Text> {
 
     public void map(LongWritable key, Text value, 
-        OutputCollector<IntWritable, Text> output, Reporter reporter) {
-
-      LOG.info("Map executing for key [" 
-          + key.toString() + "] and value [" + value.toString() + "]");
+        OutputCollector<IntWritable, Text> output, Reporter reporter)
+        throws IOException {
 
       Node node = new Node(value.toString());
 
-      output.collect(new IntWritable(node.getId()), node.getLine());
+      // the p-value is the rank of the current node divided by the # of nodes
+      int p = node.rank / node.edges.size();
 
+      // emit pagerank values as !p so that we can identify which values are 
+      // nodes and which are p-values in the reduce step
+      for(int edge : node.edges) { 
+        output.collect(new IntWritable(edge), new Text("!" + p));
+      }
+
+      // output the node ID and the node's text representation
+      output.collect(new IntWritable(node.id), new Text(node.toString()));
     }
   }
 
@@ -32,30 +41,42 @@ public class PageRank extends Configured implements Tool {
       Reducer<IntWritable, Text, IntWritable, Text> {
 
     public void reduce(IntWritable key, Iterator<Text> values,
-        OutputCollector<IntWritable, Text> output, Reporter reporter) {
-      LOG.info("Reduce executing for input key [" + key.toString() + "]");
+        OutputCollector<IntWritable, Text> output, Reporter reporter) 
+        throws IOException {
 
-      while (values.hasNext()) {
+      int rank = 0;
+      
+      Node n = null;
+
+      while(values.hasNext()) {
         Text value = values.next();
 
-        Node u = new Node(key.get() + "\t" + value.toString());
+        // check if the value is a p-value
+        if(value.toString().startsWith("!")) {
+          // parse the int out of the remaining characters and add it to 
+          rank += Integer.parseInt(value.toString().substring(1));
+        } else {
+          // otherwise, the value is the node itself
+          n = new Node(value.toString());
+        }
       }
 
-      Node n = new Node(key.get());
-      LOG.info("Reduce outputting final key [" + key + "] and value [" 
-          + n.getLine() + "]");
+      // update the node rank
+      n.rank = rank;
+      // and emit the node
+      output.collect(key, new Text(n.toString()));
     }
   }
 
   static int printUsage() {
-    System.out.println("graphsearch [-m <num mappers>] [-r <num reducers>]");
+    System.out.println("pagerank [-m <num mappers>] [-r <num reducers>]");
     ToolRunner.printGenericCommandUsage(System.out);
     return -1;
   }
 
   private JobConf getJobConf(String[] args) {
-    JobConf conf = new JobConf(getConf(), GraphSearch.class);
-    conf.setJobName("graphsearch");
+    JobConf conf = new JobConf(getConf(), PageRank.class);
+    conf.setJobName("pagerank");
 
     // the keys are the unique identifiers for a Node (ints in this case).
     conf.setOutputKeyClass(IntWritable.class);
@@ -72,9 +93,6 @@ public class PageRank extends Configured implements Tool {
         conf.setNumReduceTasks(Integer.parseInt(args[++i]));
       }
     }
-
-    LOG.info("The number of reduce tasks has been set to " + conf.getNumReduceTasks());
-    LOG.info("The number of mapper tasks has been set to " + conf.getNumMapTasks());
 
     return conf;
   }
@@ -120,8 +138,7 @@ public class PageRank extends Configured implements Tool {
   }
 
   public static void main(String[] args) throws Exception {
-    int res = ToolRunner.run(new Configuration(), new GraphSearch(), args);
+    int res = ToolRunner.run(new Configuration(), new PageRank(), args);
     System.exit(res);
   }
-
 }
