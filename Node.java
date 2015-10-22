@@ -7,8 +7,8 @@ public class Node {
    * 0      1,2,5,6|125
    */
   public final int id;
-  public List<Integer> edges;
-  public int rank;
+  public List<Integer> edges = new ArrayList<Integer>();
+  public int rank = 0;
 
   /**
    * Create a new node from its string representation
@@ -34,6 +34,10 @@ public class Node {
 
     // parse the rank (token 1)
     this.rank = Integer.parseInt(tokens[1]);
+  }
+
+  public Node(int id) {
+    this.id = id;
   }
 
   /**
